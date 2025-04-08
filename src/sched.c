@@ -45,76 +45,34 @@ void init_scheduler(void) {
  *  We implement stateful here using transition technique
  *  State representation   prio = 0 .. MAX_PRIO, curr_slot = 0..(MAX_PRIO - prio)
  */
-void set_slot_for_queue()
-{
-#ifdef SYNCH
+void reset_slot() {
 	pthread_mutex_lock(&queue_lock);
-#endif
-	for (int i = 0; i < MAX_PRIO; i++)
+	for (int i = 0; i < MAX_PRIO; i++) {
 		slot[i] = MAX_PRIO - i;
-#ifdef SYNCH
-	pthread_mutex_unlock(&queue_lock);
-#endif
-}
-int check_new_process(int i)
-{
-	for (int j = 0; j < i; j++)
-	{
-		if (empty(&mlq_ready_queue[j]) || slot[j] <= 0)
-			continue;
-		return j - 1;
 	}
-	return -2;
+	pthread_mutex_unlock(&queue_lock);
 }
+
 struct pcb_t *get_mlq_proc(void)
 {
 	struct pcb_t *proc = NULL;
 	/*TODO: get a process from PRIORITY [ready_queue].
 	 * Remember to use lock to protect the queue.
 	 */
-	int check = 0;
-	int flag = 0;
-	for (int i = 0; i < MAX_PRIO; ++i)
-	{
-		check = check_new_process(i);
-		if (check != -2)
-		{
-			i = check;
+	int resetSlot = 0;
+	for (int i = 0; i < MAX_PRIO; i++) {
+		if (empty(&mlq_ready_queue[i])) continue;
+		if (slot[i] <= 0) {
+			resetSlot = 1;
 			continue;
 		}
-
-		if (empty(&mlq_ready_queue[i]))
-		{
-			if (flag == 1 && i == MAX_PRIO - 1)
-			{
-				flag = 0;
-				set_slot_for_queue();
-				i = -1;
-			}
-			continue;
-		}
-		if (slot[i] <= 0)
-		{
-			flag = 1;
-			if (i == MAX_PRIO - 1)
-			{
-				flag = 0;
-				set_slot_for_queue();
-				i = -1;
-			}
-			continue;
-		}
-#ifdef SYNCH
 		pthread_mutex_lock(&queue_lock);
-#endif
 		proc = dequeue(&mlq_ready_queue[i]);
 		slot[i]--;
-#ifdef SYNCH
 		pthread_mutex_unlock(&queue_lock);
-#endif
-		break;
+		return proc;
 	}
-
+	if (resetSlot) reset_slot();
 	return proc;
 }
 
