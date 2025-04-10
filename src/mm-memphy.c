@@ -163,6 +163,7 @@ int MEMPHY_dump(struct memphy_struct *mp)
   /*TODO dump memphy contnt mp->storage
    *     for tracing the memory content
    */
+   // display the contents of the memory stored in the memphy_struct
    return 0;
 }
 
