@@ -88,8 +88,6 @@ int vmap_page_range(struct pcb_t *caller,           // process call
 {                                                   // no guarantee all given pages are mapped
                                                     // A structure where the function returns 
                                                     // details of the mapped region
-  // Maps a range of virtual pages to physical frames
-  // It focuses only on mapping the provided frames to the page table of the process (caller->mm->pgd[]).
 
   /* TODO: update the rg_end and rg_start of ret_rg */
   ret_rg->rg_start = addr;
@@ -106,19 +104,18 @@ int vmap_page_range(struct pcb_t *caller,           // process call
   int pgit = 0;
 
   for (pgit = 0; pgit < pgnum; pgit++) {
-    if (fpit == NULL) return -1; // Not enough frames provided
+    if (fpit == NULL) return -1; 
 
     // Map the virtual page to the physical frame
     pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn); // Set the page table entry
 
-    // Move to the next frame
     fpit = fpit->fp_next;
   }
 
 
   /* Tracking for later page replacement activities (if needed)
    * Enqueue new usage page */
-  for(pgit = 0; pgit < pgnum; pgit++) {
+  for (pgit = 0; pgit < pgnum; pgit++) {
     // Enlist the page number in the FIFO list
     enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
   }
@@ -153,15 +150,20 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
     if (MEMPHY_get_freefp(caller->mram, &fpn) == 0)
     {
       newfp_str = mallloc(sizeof(struct framephy_struct));
-      if(newfp_str == NULL) return -1; // Memory allocation failed
+      if(newfp_str == NULL) return -1; 
       newfp_str->fpn = fpn;
       newfp_str->fp_next = NULL; 
 
-      // Add the new frame to the list of allocated frames
-      if(frm_lst == NULL) {}
+      if(*frm_lst == NULL) {
+        *frm_lst = newfp_str; 
+      } else {
+        last->fp_next = newfp_str; 
+      }
+      last = newfp_str; 
     }
     else
     { // TODO: ERROR CODE of obtaining somes but not enough frames
+      return -3000;
     }
   }
 
@@ -266,12 +268,18 @@ int init_mm(struct mm_struct *mm, struct pcb_t *caller)
 
   /* TODO update VMA0 next */
   // vma0->next = ...
+  vma0->vm_next = NULL;
   
   /* Point vma owner backward */
   vma0->vm_mm = mm; 
 
   /* TODO: update mmap */
   //mm->mmap = ...
+  mm->mmap = vma0;
+
+  for (int i = 0; i < PAGING_MAX_PGN; i++) {
+    mm->pgd[i] = 0;
+  }
 
   return 0;
 }
