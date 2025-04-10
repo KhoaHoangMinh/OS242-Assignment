@@ -82,28 +82,46 @@ int pte_set_fpn(uint32_t *pte, int fpn)
  */
 int vmap_page_range(struct pcb_t *caller,           // process call
                     int addr,                       // start address which is aligned to pagesz
-                    int pgnum,                      // num of mapping page
-                    struct framephy_struct *frames, // list of the mapped frames
+                    int pgnum,                      // num of mapping page (from virtual memory to physical memory)
+                    struct framephy_struct *frames, // list of the mapped frames (already be allocated) will be mapped  to virtual pages
                     struct vm_rg_struct *ret_rg)    // return mapped region, the real mapped fp
 {                                                   // no guarantee all given pages are mapped
-  //struct framephy_struct *fpit;
-  int pgit = 0;
-  int pgn = PAGING_PGN(addr);
+                                                    // A structure where the function returns 
+                                                    // details of the mapped region
+  // Maps a range of virtual pages to physical frames
+  // It focuses only on mapping the provided frames to the page table of the process (caller->mm->pgd[]).
 
-  /* TODO: update the rg_end and rg_start of ret_rg 
-  //ret_rg->rg_end =  ....
-  //ret_rg->rg_start = ...
-  //ret_rg->vmaid = ...
-  */
+  /* TODO: update the rg_end and rg_start of ret_rg */
+  ret_rg->rg_start = addr;
+  ret_rg->rg_end = addr + pgnum * PAGING_PAGESZ;
+  // ret_rg->vmaid = 0;
+  // Where's the vmaid? It is not passed to the function
 
   /* TODO map range of frame to address space
    *      [addr to addr + pgnum*PAGING_PAGESZ
    *      in page table caller->mm->pgd[]
    */
+  struct framephy_struct *fpit = frames; // Iterator for frame list
+  int pgn = PAGING_PGN(addr); // Starting virtual page number
+  int pgit = 0;
+
+  for (pgit = 0; pgit < pgnum; pgit++) {
+    if (fpit == NULL) return -1; // Not enough frames provided
+
+    // Map the virtual page to the physical frame
+    pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn); // Set the page table entry
+
+    // Move to the next frame
+    fpit = fpit->fp_next;
+  }
+
 
   /* Tracking for later page replacement activities (if needed)
    * Enqueue new usage page */
-  enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
+  for(pgit = 0; pgit < pgnum; pgit++) {
+    // Enlist the page number in the FIFO list
+    enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
+  }
 
   return 0;
 }
@@ -118,20 +136,29 @@ int vmap_page_range(struct pcb_t *caller,           // process call
 int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struct **frm_lst)
 {
   int pgit, fpn;
-  struct framephy_struct *newfp_str = NULL;
+  struct framephy_struct *newfp_str = NULL; // Temporary pointer to build linked list of allocated frames
+  struct framephy_struct *last = NULL; // Last frame in the list
 
   /* TODO: allocate the page 
   //caller-> ...
   //frm_lst-> ...
   */
+  *frm_lst = NULL;  
 
   for (pgit = 0; pgit < req_pgnum; pgit++)
   {
   /* TODO: allocate the page 
    */
+    // For each page, allocate a free frame using MEMPHY_get_freefp
     if (MEMPHY_get_freefp(caller->mram, &fpn) == 0)
     {
+      newfp_str = mallloc(sizeof(struct framephy_struct));
+      if(newfp_str == NULL) return -1; // Memory allocation failed
       newfp_str->fpn = fpn;
+      newfp_str->fp_next = NULL; 
+
+      // Add the new frame to the list of allocated frames
+      if(frm_lst == NULL) {}
     }
     else
     { // TODO: ERROR CODE of obtaining somes but not enough frames
@@ -152,6 +179,9 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
  */
 int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int incpgnum, struct vm_rg_struct *ret_rg)
 {
+  // Handles the allocation of physical frames by call ing alloc_pages_range()
+  // Focus on establishing the mapping between virtual and physical pages (higher perspective)
+  // Insuffcient memory => out-of-memory (OOM) condition
   struct framephy_struct *frm_lst = NULL;
   int ret_alloc;
 
@@ -192,13 +222,21 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
 int __swap_cp_page(struct memphy_struct *mpsrc, int srcfpn,
                    struct memphy_struct *mpdst, int dstfpn)
 {
+  // Copy the content of a page one source physical memory frame to another physical memory frame
+  // It is assumed that the source and destination frames are already allocated
   int cellidx;
   int addrsrc, addrdst;
+  // Iterates over all bytes in one page, PAGING_PAGESZ: size of a single page
   for (cellidx = 0; cellidx < PAGING_PAGESZ; cellidx++)
   {
+    // Calculate the physical addr
+    // addr = page_number * page_size + cell_index
     addrsrc = srcfpn * PAGING_PAGESZ + cellidx;
     addrdst = dstfpn * PAGING_PAGESZ + cellidx;
 
+    // For each byte:
+    // Read the byte from source
+    // Write the byte to destination
     BYTE data;
     MEMPHY_read(mpsrc, addrsrc, &data);
     MEMPHY_write(mpdst, addrdst, data);
@@ -228,7 +266,7 @@ int init_mm(struct mm_struct *mm, struct pcb_t *caller)
 
   /* TODO update VMA0 next */
   // vma0->next = ...
-
+  
   /* Point vma owner backward */
   vma0->vm_mm = mm; 
 
