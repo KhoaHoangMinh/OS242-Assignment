@@ -80,44 +80,37 @@ int pte_set_fpn(uint32_t *pte, int fpn)
 /*
  * vmap_page_range - map a range of page at aligned address
  */
+/** 
+ * NOTE: cleaned
+ */
 int vmap_page_range(struct pcb_t *caller,           // process call
                     int addr,                       // start address which is aligned to pagesz
-                    int pgnum,                      // num of mapping page (from virtual memory to physical memory)
-                    struct framephy_struct *frames, // list of the mapped frames (already be allocated) will be mapped  to virtual pages
+                    int pgnum,                      // num of mapping page 
+                    struct framephy_struct *frames, // list of the mapped frames 
                     struct vm_rg_struct *ret_rg)    // return mapped region, the real mapped fp
-{                                                   // no guarantee all given pages are mapped
-                                                    // A structure where the function returns 
-                                                    // details of the mapped region
-
-  /* TODO: update the rg_end and rg_start of ret_rg */
+{
+  // Update the start and end of the mapped region
   ret_rg->rg_start = addr;
   ret_rg->rg_end = addr + pgnum * PAGING_PAGESZ;
-  // ret_rg->vmaid = 0;
-  // Where's the vmaid? It is not passed to the function
 
-  /* TODO map range of frame to address space
-   *      [addr to addr + pgnum*PAGING_PAGESZ
-   *      in page table caller->mm->pgd[]
-   */
   struct framephy_struct *fpit = frames; // Iterator for frame list
-  int pgn = PAGING_PGN(addr); // Starting virtual page number
-  int pgit = 0;
+  int pgn = PAGING_PGN(addr);            // Starting virtual page number
+  int pgit;
 
+  // Map each virtual page to a physical frame
   for (pgit = 0; pgit < pgnum; pgit++) {
-    if (fpit == NULL) return -1; 
+      if (fpit == NULL) return -1; // No more frames available
 
-    // Map the virtual page to the physical frame
-    pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn); // Set the page table entry
+      // Set the page table entry for the virtual page
+      pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn);
 
-    fpit = fpit->fp_next;
+      // Move to the next frame in the list
+      fpit = fpit->fp_next;
   }
 
-
-  /* Tracking for later page replacement activities (if needed)
-   * Enqueue new usage page */
+  // Enqueue the mapped pages for tracking (e.g., for page replacement)
   for (pgit = 0; pgit < pgnum; pgit++) {
-    // Enlist the page number in the FIFO list
-    enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
+      enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
   }
 
   return 0;
@@ -129,45 +122,39 @@ int vmap_page_range(struct pcb_t *caller,           // process call
  * @req_pgnum : request page num
  * @frm_lst   : frame list
  */
-
+/**
+ * NOTE: cleaned 
+ */
 int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struct **frm_lst)
 {
   int pgit, fpn;
   struct framephy_struct *newfp_str = NULL; // Temporary pointer to build linked list of allocated frames
-  struct framephy_struct *last = NULL; // Last frame in the list
+  struct framephy_struct *last = NULL;     // Last frame in the list
 
-  /* TODO: allocate the page 
-  //caller-> ...
-  //frm_lst-> ...
-  */
-  *frm_lst = NULL;  
+  *frm_lst = NULL; // Initialize the frame list
 
-  for (pgit = 0; pgit < req_pgnum; pgit++)
-  {
-  /* TODO: allocate the page 
-   */
-    // For each page, allocate a free frame using MEMPHY_get_freefp
-    if (MEMPHY_get_freefp(caller->mram, &fpn) == 0)
-    {
-      newfp_str = mallloc(sizeof(struct framephy_struct));
-      if(newfp_str == NULL) return -1; 
-      newfp_str->fpn = fpn;
-      newfp_str->fp_next = NULL; 
+  for (pgit = 0; pgit < req_pgnum; pgit++) {
+      // Allocate a free frame using MEMPHY_get_freefp
+      if (MEMPHY_get_freefp(caller->mram, &fpn) == 0) {
+          newfp_str = malloc(sizeof(struct framephy_struct));
+          if (newfp_str == NULL) return -1; // Allocation failed
 
-      if(*frm_lst == NULL) {
-        *frm_lst = newfp_str; 
+          newfp_str->fpn = fpn;
+          newfp_str->fp_next = NULL;
+
+          if (*frm_lst == NULL) {
+              *frm_lst = newfp_str; // Set the first frame
+          } else {
+              last->fp_next = newfp_str; // Append to the list
+          }
+          last = newfp_str; // Update the last frame
       } else {
-        last->fp_next = newfp_str; 
+          // Not enough frames available
+          return -3000;
       }
-      last = newfp_str; 
-    }
-    else
-    { // TODO: ERROR CODE of obtaining somes but not enough frames
-      return -3000;
-    }
   }
 
-  return 0;
+  return 0; // Success
 }
 
 /*
@@ -181,9 +168,6 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
  */
 int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int incpgnum, struct vm_rg_struct *ret_rg)
 {
-  // Handles the allocation of physical frames by call ing alloc_pages_range()
-  // Focus on establishing the mapping between virtual and physical pages (higher perspective)
-  // Insuffcient memory => out-of-memory (OOM) condition
   struct framephy_struct *frm_lst = NULL;
   int ret_alloc;
 
@@ -224,21 +208,13 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
 int __swap_cp_page(struct memphy_struct *mpsrc, int srcfpn,
                    struct memphy_struct *mpdst, int dstfpn)
 {
-  // Copy the content of a page one source physical memory frame to another physical memory frame
-  // It is assumed that the source and destination frames are already allocated
   int cellidx;
   int addrsrc, addrdst;
-  // Iterates over all bytes in one page, PAGING_PAGESZ: size of a single page
   for (cellidx = 0; cellidx < PAGING_PAGESZ; cellidx++)
   {
-    // Calculate the physical addr
-    // addr = page_number * page_size + cell_index
     addrsrc = srcfpn * PAGING_PAGESZ + cellidx;
     addrdst = dstfpn * PAGING_PAGESZ + cellidx;
 
-    // For each byte:
-    // Read the byte from source
-    // Write the byte to destination
     BYTE data;
     MEMPHY_read(mpsrc, addrsrc, &data);
     MEMPHY_write(mpdst, addrdst, data);
@@ -252,36 +228,50 @@ int __swap_cp_page(struct memphy_struct *mpsrc, int srcfpn,
  * @mm:     self mm
  * @caller: mm owner
  */
+/**'
+ * NOTE: cleaned
+ * @implements: Allocates pgd -> pgd[i] = 0 -> init symrtbl[i]
+ * -> init vma0 -> init vma0 -> enlist_vm_rg_node first_rg
+ * @note: is line 249 neccesary?
+ */
 int init_mm(struct mm_struct *mm, struct pcb_t *caller)
 {
-  struct vm_area_struct *vma0 = malloc(sizeof(struct vm_area_struct));
-
+  // Allocate memory for the page directory
   mm->pgd = malloc(PAGING_MAX_PGN * sizeof(uint32_t));
+  if (mm->pgd == NULL) return -1; // Allocation failed
 
-  /* By default the owner comes with at least one vma */
-  vma0->vm_id = 0;
-  vma0->vm_start = 0;
-  vma0->vm_end = vma0->vm_start;
-  vma0->sbrk = vma0->vm_start;
-  struct vm_rg_struct *first_rg = init_vm_rg(vma0->vm_start, vma0->vm_end);
-  enlist_vm_rg_node(&vma0->vm_freerg_list, first_rg);
-
-  /* TODO update VMA0 next */
-  // vma0->next = ...
-  vma0->vm_next = NULL;
-  
-  /* Point vma owner backward */
-  vma0->vm_mm = mm; 
-
-  /* TODO: update mmap */
-  //mm->mmap = ...
-  mm->mmap = vma0;
-
+  // Initialize the page directory entries to 0
   for (int i = 0; i < PAGING_MAX_PGN; i++) {
     mm->pgd[i] = 0;
   }
 
-  return 0;
+  // Initialize the symbol region table
+  for (int i = 0; i < PAGING_MAX_SYMTBL_SZ; i++) {
+      mm->symrgtbl[i].rg_start = -1;
+      mm->symrgtbl[i].rg_end = -1;
+      mm->symrgtbl[i].rg_next = NULL;
+  }
+
+  // Create the first virtual memory area (VMA)
+  struct vm_area_struct *vma0 = malloc(sizeof(struct vm_area_struct));
+  if (vma0 == NULL) return -1; // Allocation failed
+
+  vma0->vm_id = 0;
+  vma0->vm_start = 0;
+  vma0->vm_end = 0; // Initially empty
+  vma0->sbrk = 0;   // Program break starts at 0
+  vma0->vm_next = NULL;
+
+  // Initialize the free region list for the VMA
+  struct vm_rg_struct *first_rg = init_vm_rg(vma0->vm_start, vma0->vm_end);
+  if (first_rg == NULL) return -1; // Allocation failed
+  enlist_vm_rg_node(&vma0->vm_freerg_list, first_rg);
+
+  // Link the VMA to the memory management structure
+  vma0->vm_mm = mm;
+  mm->mmap = vma0;
+
+  return 0; // Success
 }
 
 struct vm_rg_struct *init_vm_rg(int rg_start, int rg_end)
