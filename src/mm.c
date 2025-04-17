@@ -99,18 +99,16 @@ int vmap_page_range(struct pcb_t *caller,           // process call
 
   // Map each virtual page to a physical frame
   for (pgit = 0; pgit < pgnum; pgit++) {
-      if (fpit == NULL) return -1; // No more frames available
+    if (fpit == NULL) return -1; // No more frames available
 
-      // Set the page table entry for the virtual page
-      pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn);
+    // Set the page table entry for the virtual page
+    pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn);
 
-      // Move to the next frame in the list
-      fpit = fpit->fp_next;
-  }
+    // Move to the next frame in the list
+    fpit = fpit->fp_next;
 
-  // Enqueue the mapped pages for tracking (e.g., for page replacement)
-  for (pgit = 0; pgit < pgnum; pgit++) {
-      enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
+    // Enqueue the mapped pages for tracking (e.g., for page replacement)
+    enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
   }
 
   return 0;
@@ -128,30 +126,23 @@ int vmap_page_range(struct pcb_t *caller,           // process call
 int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struct **frm_lst)
 {
   int pgit, fpn;
-  struct framephy_struct *newfp_str = NULL; // Temporary pointer to build linked list of allocated frames
-  struct framephy_struct *last = NULL;     // Last frame in the list
-
-  *frm_lst = NULL; // Initialize the frame list
+  struct framephy_struct *newfp_str = NULL;
+  *frm_lst = NULL;
 
   for (pgit = 0; pgit < req_pgnum; pgit++) {
-      // Allocate a free frame using MEMPHY_get_freefp
-      if (MEMPHY_get_freefp(caller->mram, &fpn) == 0) {
-          newfp_str = malloc(sizeof(struct framephy_struct));
-          if (newfp_str == NULL) return -1; // Allocation failed
+    newfp_str = malloc(sizeof(struct framephy_struct));
+    if (newfp_str == NULL) return -1;
 
-          newfp_str->fpn = fpn;
-          newfp_str->fp_next = NULL;
+    if (MEMPHY_get_freefp(caller->mram, &fpn) == 0) {
+      newfp_str->fpn = fpn;
+    } else {
+      // Not enough frames available
+      // NOTE: Free all frames and return free frame list
+      return -3000;
+    }
 
-          if (*frm_lst == NULL) {
-              *frm_lst = newfp_str; // Set the first frame
-          } else {
-              last->fp_next = newfp_str; // Append to the list
-          }
-          last = newfp_str; // Update the last frame
-      } else {
-          // Not enough frames available
-          return -3000;
-      }
+    newfp_str->fp_next = *frm_lst;
+    *frm_lst = newfp_str; 
   }
 
   return 0; // Success
@@ -243,13 +234,6 @@ int init_mm(struct mm_struct *mm, struct pcb_t *caller)
   // Initialize the page directory entries to 0
   for (int i = 0; i < PAGING_MAX_PGN; i++) {
     mm->pgd[i] = 0;
-  }
-
-  // Initialize the symbol region table
-  for (int i = 0; i < PAGING_MAX_SYMTBL_SZ; i++) {
-      mm->symrgtbl[i].rg_start = -1;
-      mm->symrgtbl[i].rg_end = -1;
-      mm->symrgtbl[i].rg_next = NULL;
   }
 
   // Create the first virtual memory area (VMA)
