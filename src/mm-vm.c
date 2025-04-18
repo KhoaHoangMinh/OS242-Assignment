@@ -52,7 +52,7 @@ int __mm_swap_page(struct pcb_t *caller, int vicfpn , int swpfpn)
  */
 /**
  * NOTE: cleaned
- * @note: at line 67: += size or alignedsz?
+ * @note: deleted cur_vma->sbrk += alignedsz;
  */
 struct vm_rg_struct *get_vm_area_node_at_brk(struct pcb_t *caller, int vmaid, int size, int alignedsz)
 {
@@ -64,7 +64,6 @@ struct vm_rg_struct *get_vm_area_node_at_brk(struct pcb_t *caller, int vmaid, in
   // Set the start and end of the new region
   newrg->rg_start = cur_vma->sbrk;
   newrg->rg_end = newrg->rg_start + alignedsz;
-  cur_vma->sbrk += alignedsz;
 
   return newrg;
 }
