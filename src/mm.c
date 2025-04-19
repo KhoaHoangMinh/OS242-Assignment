@@ -223,7 +223,7 @@ int __swap_cp_page(struct memphy_struct *mpsrc, int srcfpn,
  * NOTE: cleaned
  * @implements: Allocates pgd -> pgd[i] = 0 -> init symrtbl[i]
  * -> init vma0 -> init vma0 -> enlist_vm_rg_node first_rg
- * @note: is line 249 neccesary?
+ * add   first_rg->rg_next = NULL;
  */
 int init_mm(struct mm_struct *mm, struct pcb_t *caller)
 {
@@ -249,6 +249,7 @@ int init_mm(struct mm_struct *mm, struct pcb_t *caller)
   // Initialize the free region list for the VMA
   struct vm_rg_struct *first_rg = init_vm_rg(vma0->vm_start, vma0->vm_end);
   if (first_rg == NULL) return -1; // Allocation failed
+  first_rg->rg_next = NULL;
   enlist_vm_rg_node(&vma0->vm_freerg_list, first_rg);
 
   // Link the VMA to the memory management structure
