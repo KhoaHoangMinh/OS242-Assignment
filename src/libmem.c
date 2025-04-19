@@ -120,6 +120,10 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
  */
 /**
  * NOTE: cleaned
+ * @note: deleted resetting rg_start and rg_end
+ * rgnode->rg_start = -1;
+ * rgnode->rg_end = -1;
+ * This causes new process to allocate new region instead of using the freed one
  */
 int __free(struct pcb_t *caller, int vmaid, int rgid)
 {
@@ -134,10 +138,6 @@ int __free(struct pcb_t *caller, int vmaid, int rgid)
   // Add the region back to the free region list
   if (enlist_vm_freerg_list(caller->mm, rgnode) < 0)
     return -1;
-
-  // Mark the region as invalid
-  rgnode->rg_start = -1;
-  rgnode->rg_end = -1;
 
   return 0;
 }
