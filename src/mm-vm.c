@@ -132,7 +132,10 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
     free(newrg);
     return -1;
   }
-  free(newrg);
+  // enlist_vm_freerg_list(&caller->mm, newrg);
+  // @note: the problem is that get_free_vmrg_area() does not receive the updated start and end
+  printf("Newly allocated region: %d - %d\n", (int)newrg->rg_start, (int)newrg->rg_end);
+  printf("Finished inc_vma_limit\n");
   return 0; // Success
 }
 
