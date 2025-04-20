@@ -53,6 +53,8 @@ int __mm_swap_page(struct pcb_t *caller, int vicfpn , int swpfpn)
 /**
  * NOTE: cleaned
  * @note: deleted cur_vma->sbrk += alignedsz;
+ * deleted newrg->rg_end = newrg->rg_start + alignedsz;
+ * The newrg's end is not aligned to the page size
  */
 struct vm_rg_struct *get_vm_area_node_at_brk(struct pcb_t *caller, int vmaid, int size, int alignedsz)
 {
@@ -63,8 +65,7 @@ struct vm_rg_struct *get_vm_area_node_at_brk(struct pcb_t *caller, int vmaid, in
 
   // Set the start and end of the new region
   newrg->rg_start = cur_vma->sbrk;
-  // newrg->rg_end = newrg->rg_start + alignedsz;
-  newrg->rg_end = newrg->rg_start + size; // Modifed to use size instead of alignedsz
+  newrg->rg_end = newrg->rg_start + size;
   return newrg;
 }
 
@@ -133,10 +134,6 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
     free(newrg);
     return -1;
   }
-  // enlist_vm_freerg_list(&caller->mm, newrg);
-  // @note: the problem is that get_free_vmrg_area() does not receive the updated start and end
-  printf("Newly allocated region: %d - %d\n", (int)newrg->rg_start, (int)newrg->rg_end);
-  printf("Finished inc_vma_limit\n");
   return 0; // Success
 }
 
