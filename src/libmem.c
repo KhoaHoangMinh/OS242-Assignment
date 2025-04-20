@@ -97,17 +97,16 @@ int MEMPHY_dump1(struct memphy_struct *mp)
   return 0;
 }
 
-void alloc_dump(struct pcb_t *caller, int size) {
+void alloc_dump(struct pcb_t *caller, int size, int alloc_addr) {
   // if (caller->pid != 3) return;
   pthread_mutex_lock(&mmvm_lock);
   printf("===== PHYSICAL MEMORY AFTER ALLOCATION =====\n");
   int start_page = PAGING_PGN(get_vma_by_num(caller->mm, 0)->vm_start);
   int end_page = PAGING_PGN(get_vma_by_num(caller->mm, 0)->vm_end);
   int num_regions = end_page - start_page;
-  printf("PID=%d - Region=%d - Address=%08x - Size=%d byte\n",
-         caller->pid, num_regions, (int)caller->mm->symrgtbl[0].rg_start,
+  printf("PID=%d - Region=%d - Address=%08lx - Size=%d byte\n",
+         caller->pid, num_regions, alloc_addr,
          size);
-  printf("sbrk=%ld\n", caller->mm->mmap->sbrk);       
   print_pgtbl(caller, 0, -1);
 
   // Iteratively print all mapped pages
@@ -138,11 +137,23 @@ void dealloc_dump(struct pcb_t *caller) {
   pthread_mutex_unlock(&mmvm_lock);
 }
 
-void write_dump(struct pcb_t *caller, int offset, BYTE value) {
+void write_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
   pthread_mutex_lock(&mmvm_lock);
   printf("===== PHYSICAL MEMORY AFTER WRITING =====\n");
   printf("write region=%ld offset=%d value=%d\n",
-         caller->mm->symrgtbl[0].rg_start, offset, value);
+         rgid, offset, value);
+  print_pgtbl(caller, 0, -1);       
+  helper(caller);
+  MEMPHY_dump1(caller->mram);
+  printf("================================================================\n");
+  pthread_mutex_unlock(&mmvm_lock);
+}
+
+void read_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
+  pthread_mutex_lock(&mmvm_lock);
+  printf("===== PHYSICAL MEMORY AFTER READING =====\n");
+  printf("read region=%ld offset=%d value=%d\n",
+         rgid, offset, value);
   print_pgtbl(caller, 0, -1);       
   helper(caller);
   MEMPHY_dump1(caller->mram);
@@ -182,7 +193,7 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
     caller->mm->symrgtbl[rgid].rg_end = rgnode.rg_end;
     *alloc_addr = rgnode.rg_start;
     pthread_mutex_unlock(&mmvm_lock);
-    alloc_dump(caller, size);
+    alloc_dump(caller, size, *alloc_addr);
     return 0;
   }
 
@@ -214,7 +225,7 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   }
   
   pthread_mutex_unlock(&mmvm_lock);
-  alloc_dump(caller, size);
+  alloc_dump(caller, size, *alloc_addr);
   return 0;
 }
 
@@ -408,6 +419,7 @@ int __read(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE *data)
 
   pg_getval(caller->mm, currg->rg_start + offset, data, caller);
 
+  read_dump(caller, offset, *data, rgid);
   return 0;
 }
 
@@ -454,8 +466,7 @@ int __write(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE value)
     return -1;
 
   pg_setval(caller->mm, currg->rg_start + offset, value, caller);
-
-  write_dump(caller, offset, value);
+  write_dump(caller, offset, value, rgid);
   return 0;
 }
 
