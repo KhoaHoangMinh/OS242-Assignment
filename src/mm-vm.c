@@ -63,8 +63,8 @@ struct vm_rg_struct *get_vm_area_node_at_brk(struct pcb_t *caller, int vmaid, in
 
   // Set the start and end of the new region
   newrg->rg_start = cur_vma->sbrk;
-  newrg->rg_end = newrg->rg_start + alignedsz;
-
+  // newrg->rg_end = newrg->rg_start + alignedsz;
+  newrg->rg_end = newrg->rg_start + size; // Modifed to use size instead of alignedsz
   return newrg;
 }
 
@@ -108,6 +108,7 @@ int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, int vmastart, int 
  * @note: extended 
  * cur_vma->vm_end = old_end + inc_amt;
    cur_vma->sbrk += inc_amt;
+   Delete free(newrg);
 */
 int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
 {
