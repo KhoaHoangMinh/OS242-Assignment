@@ -296,7 +296,9 @@ int libfree(struct pcb_t *proc, uint32_t reg_index)
  */
 /**
  * NOTE: cleaned
- * @note: directly call the swap functions instead of syscall 
+ * @note: directly call the swap functions instead of syscall
+ * @note: modified swaptype from 1 to 0 to fix 00000000: c0000001
+ *  pte_set_swap(&mm->pgd[vicpgn], 0, swpfpn);
  */
 int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 {
@@ -314,7 +316,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     // Swap victim page to MEMSWP
     vicfpn = PAGING_FPN(mm->pgd[vicpgn]);
     __mm_swap_page(caller, vicfpn, swpfpn);
-    pte_set_swap(&mm->pgd[vicpgn], 1, swpfpn);
+    pte_set_swap(&mm->pgd[vicpgn], 0, swpfpn);
 
     // Get a free frame in MEMRAM
     if (MEMPHY_get_freefp(caller->mram, &tgtfpn) < 0) return -1;
