@@ -93,7 +93,6 @@ struct pcb_t * get_proc(void) {
 }
 
 void put_proc(struct pcb_t * proc) {
-	printf("inside put_proc\n");
 	proc->ready_queue = &ready_queue;
 	proc->mlq_ready_queue = mlq_ready_queue;
 	proc->running_list = & running_list;
@@ -107,7 +106,6 @@ void put_proc(struct pcb_t * proc) {
 }
 
 void add_proc(struct pcb_t * proc) {
-	printf("inside add_proc\n");
 	proc->ready_queue = &ready_queue;
 	proc->mlq_ready_queue = mlq_ready_queue;
 	proc->running_list = & running_list;
