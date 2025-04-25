@@ -1,12 +1,12 @@
 /*
- * Copyright (C) 2025 pdnguyen of HCMC University of Technology VNU-HCM
- */
+* Copyright (C) 2025 pdnguyen of HCMC University of Technology VNU-HCM
+*/
 
 /* Sierra release
- * Source Code License Grant: The authors hereby grant to Licensee
- * personal permission to use and modify the Licensed Source Code
- * for the sole purpose of studying while attending the course CO2018.
- */
+* Source Code License Grant: The authors hereby grant to Licensee
+* personal permission to use and modify the Licensed Source Code
+* for the sole purpose of studying while attending the course CO2018.
+*/
 
 #include "common.h"
 #include "syscall.h"
@@ -35,34 +35,35 @@ int __sys_killall(struct pcb_t *caller, struct sc_regs* regs)
     printf("The procname retrieved from memregionid %d is \"%s\"\n", memrg, proc_name);
 
     /* TODO: Traverse proclist to terminate the proc
-     *       stcmp to check the process match proc_name
-     */
+    *       stcmp to check the process match proc_name
+    */
     //caller->running_list
     //caller->mlq_ready_queu
 
     /* TODO Maching and terminating 
-     *       all processes with given
-     *        name in var proc_name
-     */
+    *       all processes with given
+    *        name in var proc_name
+    */
+
     int target_pid = (proc_name[1] - '0') + 1;
     printf("Target PID: %d\n", target_pid);
     //printf("First proc pid: %d\n", caller->running_list->proc[0]->pid); (running_list->size == 0 nên gây segmentaition fault)
     int kill_count = 0;
-    printf("0\n");
+
+    for(int i = 0; i < caller->running_list->size; i++){
+        struct pcb_t* proc = caller->running_list->proc[i];
+        printf("%d: PID = %d, Priority = %d, Path %s, Address = %p\n", i, proc->pid, proc->priority, proc->path, (void*)proc);
+    }
+    printf("Running list size: %d\n\n", caller->running_list->size);
 
     if(caller->running_list != NULL){
-        printf("loop 1\n");
-        printf("Running list size: %d\n", caller->running_list->size);
         struct queue_t* running_q = caller->running_list;
         for(int i = 0; i < running_q->size; i++){
-            printf("loop 1.1\n");
             struct pcb_t* running_proc = running_q->proc[i];
             if(running_proc->pid == target_pid){
-                printf("if 1\n");
                 printf("Killing process \"%s\" with PID %d\n", proc_name, target_pid);
 
                 for(int j = i; j < running_q->size - 1; j++){
-                    printf("loop 1.2\n");
                     running_q->proc[j] = running_q->proc[j + 1];
                 }
                 
@@ -71,29 +72,38 @@ int __sys_killall(struct pcb_t *caller, struct sc_regs* regs)
                 running_q->size--;
                 kill_count++;
 
-                printf("if 1.1\n");
-                printf("Process \"%s\" with PID %d killed\n", proc_name, target_pid);
+                for(int i = 0; i < running_q->size; i++){
+                    struct pcb_t* proc = running_q->proc[i];
+                    printf("%d: PID = %d, Priority = %d, Path %s\n", i, proc->pid, proc->priority, proc->path);
+                }
+
+                printf("Process \"%s\" with PID %d killed\n\n", proc_name, target_pid);
             }
         }
     }
+    printf("\n");
 
-    printf("2\n");
     #ifdef MLQ_SCHED
+    if(caller->mlq_ready_queue){
+        for(int i = 0; i < caller->mlq_ready_queue->size; i++){
+            struct queue_t* mlq_q = &caller->mlq_ready_queue[i];
+            for(int j = 0; j < mlq_q->size; j++){
+                struct pcb_t* mlq_proc = mlq_q->proc[j];
+                printf("%d: PID = %d, Priority = %d, Path %s\n", j, mlq_proc->pid, mlq_proc->priority, mlq_proc->path);
+            }
+        }
+    }
+    printf("MLQ ready queue size: %d\n\n", caller->mlq_ready_queue->size);
+
     if(caller->mlq_ready_queue != NULL){
-        printf("loop 2\n");
-        for(int prio = 0; prio < MAX_PRIO; prio++){
-            printf("loop 2.1\n");
-            printf("MLQ Ready Queue size: %d\n", caller->mlq_ready_queue[prio].size);
+        for(int prio = 0; prio < caller->mlq_ready_queue->size; prio++){
             struct queue_t* mlq_q = &caller->mlq_ready_queue[prio];
             for(int i = 0; i < mlq_q->size; i++){
-                printf("loop 2.2\n");
                 struct pcb_t* mlq_proc = mlq_q->proc[i];
                 if(mlq_proc->pid == target_pid){
-                    printf("if 2\n");
                     printf("Killing MLQ process \"%s\" with PID %d at priority %d\n", proc_name, target_pid, prio);
 
                     for(int j = i; j < mlq_q->size - 1; j++){
-                        printf("loop 2.3\n");
                         mlq_q->proc[j] = mlq_q->proc[j + 1];
                     }
 
@@ -102,16 +112,21 @@ int __sys_killall(struct pcb_t *caller, struct sc_regs* regs)
                     mlq_q->size--;
                     kill_count++;
 
-                    printf("if 2.1\n");
-                    printf("MLQ Process \"%s\" with PID %d at priority %d killed\n", proc_name, target_pid, prio);
+                    for(int i = 0; i < caller->mlq_ready_queue->size; i++){
+                        struct queue_t* mlq_q = &caller->mlq_ready_queue[i];
+                        for(int j = 0; j < mlq_q->size; j++){
+                            struct pcb_t* mlq_proc = mlq_q->proc[j];
+                            printf("%d: PID = %d, Priority = %d, Path %s\n", j, mlq_proc->pid, mlq_proc->priority, mlq_proc->path);
+                        }
+                    }
+
+                    printf("MLQ Process \"%s\" with PID %d at priority %d killed\n\n", proc_name, target_pid, prio);
                 }
             }
         }
     }
     #endif  
 
-    printf("3\n");
     printf("Total of %d processes with name \"%s\" were killed\n", kill_count, proc_name);
-    return kill_count; 
-    //return 0; 
+    return 0; 
 }
