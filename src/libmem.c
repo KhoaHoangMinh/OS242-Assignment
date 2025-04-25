@@ -104,7 +104,7 @@ void alloc_dump(struct pcb_t *caller, int size, int alloc_addr) {
   int start_page = PAGING_PGN(get_vma_by_num(caller->mm, 0)->vm_start);
   int end_page = PAGING_PGN(get_vma_by_num(caller->mm, 0)->vm_end);
   int num_regions = end_page - start_page;
-  printf("PID=%d - Region=%d - Address=%08lx - Size=%d byte\n",
+  printf("PID=%d - Region=%d - Address=%08x - Size=%d byte\n",
          caller->pid, num_regions, alloc_addr,
          size);
   print_pgtbl(caller, 0, -1);
@@ -140,7 +140,7 @@ void dealloc_dump(struct pcb_t *caller) {
 void write_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
   pthread_mutex_lock(&mmvm_lock);
   printf("===== PHYSICAL MEMORY AFTER WRITING =====\n");
-  printf("write region=%ld offset=%d value=%d\n",
+  printf("write region=%d offset=%d value=%d\n",
          rgid, offset, value);
   print_pgtbl(caller, 0, -1);       
   helper(caller);
@@ -152,7 +152,7 @@ void write_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
 void read_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
   pthread_mutex_lock(&mmvm_lock);
   printf("===== PHYSICAL MEMORY AFTER READING =====\n");
-  printf("read region=%ld offset=%d value=%d\n",
+  printf("read region=%d offset=%d value=%d\n",
          rgid, offset, value);
   print_pgtbl(caller, 0, -1);       
   helper(caller);
@@ -225,7 +225,9 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   }
   
   pthread_mutex_unlock(&mmvm_lock);
+#ifdef IODUMP
   alloc_dump(caller, size, *alloc_addr);
+#endif
   return 0;
 }
 
@@ -256,7 +258,9 @@ int __free(struct pcb_t *caller, int vmaid, int rgid)
   // Add the region back to the free region list
   if (enlist_vm_freerg_list(caller->mm, rgnode) < 0)
     return -1;
+#ifdef IODUMP
   dealloc_dump(caller);
+#endif
   return 0;
 }
 
@@ -421,7 +425,9 @@ int __read(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE *data)
 
   pg_getval(caller->mm, currg->rg_start + offset, data, caller);
 
+#ifdef IODUMP
   read_dump(caller, offset, *data, rgid);
+#endif  
   return 0;
 }
 
@@ -441,7 +447,7 @@ int libread(
   }
   //destination 
 #ifdef IODUMP
-  printf("read region=%d offset=%d value=%d\n", source, offset, data);
+  // printf("read region=%d offset=%d value=%d\n", source, offset, data);
 #ifdef PAGETBL_DUMP
   print_pgtbl(proc, 0, -1); //print max TBL
 #endif
@@ -468,7 +474,9 @@ int __write(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE value)
     return -1;
 
   pg_setval(caller->mm, currg->rg_start + offset, value, caller);
+#ifdef IODUMP
   write_dump(caller, offset, value, rgid);
+#endif
   return 0;
 }
 
@@ -484,7 +492,7 @@ int libwrite(
 #ifdef PAGETBL_DUMP
   print_pgtbl(proc, 0, -1); //print max TBL
 #endif
-  MEMPHY_dump(proc->mram);
+  // MEMPHY_dump(proc->mram);
 #endif
 
   return __write(proc, 0, destination, offset, data);
