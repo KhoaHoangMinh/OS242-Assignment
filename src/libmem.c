@@ -319,13 +319,25 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
     // Swap victim page to MEMSWP
     vicfpn = PAGING_FPN(mm->pgd[vicpgn]);
-    __mm_swap_page(caller, vicfpn, swpfpn);
+    // __mm_swap_page(caller, vicfpn, swpfpn);
+
+    struct sc_regs regs;
+    regs.a1 = SYSMEM_SWP_OP;
+    regs.a2 = vicpgn;
+    regs.a3 = swpfpn;
+    if (syscall(caller, 17, &regs) < 0) return -1;
+
     pte_set_swap(&mm->pgd[vicpgn], 0, swpfpn);
 
     // Get a free frame in MEMRAM
     if (MEMPHY_get_freefp(caller->mram, &tgtfpn) < 0) return -1;
+
     // Swap target frame from MEMSWP to MEMRAM
-    __mm_swap_page(caller, tgtfpn, PAGING_PTE_SWP(pte));
+    regs.a1 = SYSMEM_SWP_OP;
+    regs.a2 = tgtfpn;
+    regs.a3 = PAGING_PTE_SWP(pte);
+    if (syscall(caller, 17, &regs) < 0) return -1;
+
     pte_set_fpn(&mm->pgd[pgn], tgtfpn);
 
     // Enlist the page in the FIFO list
