@@ -99,7 +99,6 @@ int MEMPHY_dump1(struct memphy_struct *mp)
 
 void alloc_dump(struct pcb_t *caller, int size, int alloc_addr) {
   // if (caller->pid != 3) return;
-  pthread_mutex_lock(&mmvm_lock);
   printf("===== PHYSICAL MEMORY AFTER ALLOCATION =====\n");
   int start_page = PAGING_PGN(get_vma_by_num(caller->mm, 0)->vm_start);
   int end_page = PAGING_PGN(get_vma_by_num(caller->mm, 0)->vm_end);
@@ -116,12 +115,10 @@ void alloc_dump(struct pcb_t *caller, int size, int alloc_addr) {
   // }
   helper(caller);
   printf("================================================================\n");
-  pthread_mutex_unlock(&mmvm_lock);
 }
 
 void dealloc_dump(struct pcb_t *caller) {
   // if (caller->pid != 3) return;
-  pthread_mutex_lock(&mmvm_lock);
   int start_page = PAGING_PGN(get_vma_by_num(caller->mm, 0)->vm_start);
   int end_page = PAGING_PGN(get_vma_by_num(caller->mm, 0)->vm_end);
   int num_regions = end_page - start_page;
@@ -134,11 +131,9 @@ void dealloc_dump(struct pcb_t *caller) {
   // }
   helper(caller);
   printf("================================================================\n");
-  pthread_mutex_unlock(&mmvm_lock);
 }
 
 void write_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
-  pthread_mutex_lock(&mmvm_lock);
   printf("===== PHYSICAL MEMORY AFTER WRITING =====\n");
   printf("write region=%d offset=%d value=%d\n",
          rgid, offset, value);
@@ -146,11 +141,9 @@ void write_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
   helper(caller);
   MEMPHY_dump1(caller->mram);
   printf("================================================================\n");
-  pthread_mutex_unlock(&mmvm_lock);
 }
 
 void read_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
-  pthread_mutex_lock(&mmvm_lock);
   printf("===== PHYSICAL MEMORY AFTER READING =====\n");
   printf("read region=%d offset=%d value=%d\n",
          rgid, offset, value);
@@ -158,7 +151,6 @@ void read_dump(struct pcb_t *caller, int offset, BYTE value, int rgid) {
   helper(caller);
   MEMPHY_dump1(caller->mram);
   printf("================================================================\n");
-  pthread_mutex_unlock(&mmvm_lock);
 }
 
 /*__alloc - allocate a region memory
@@ -500,7 +492,7 @@ int libwrite(
     uint32_t offset)
 {
 #ifdef IODUMP
-  printf("write region=%d offset=%d value=%d\n", destination, offset, data);
+  // printf("write region=%d offset=%d value=%d\n", destination, offset, data);
 #ifdef PAGETBL_DUMP
   print_pgtbl(proc, 0, -1); //print max TBL
 #endif
