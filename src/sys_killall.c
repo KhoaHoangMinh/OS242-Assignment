@@ -63,18 +63,19 @@ int __sys_killall(struct pcb_t *caller, struct sc_regs* regs)
         i++;
     }
 #ifdef MLQ_SCHED
-    list_size = caller->ready_queue->size;
+    int prio = caller->prio;
+    list_size = caller->mlq_ready_queue[prio].size;
     i = 0;
     while (i < list_size) {
-        proc_name = caller->ready_queue->proc[i]->path + dir_len;
+    proc_name = caller->mlq_ready_queue[prio].proc[i]->path + dir_len;
         if (strcmp(proc_name, proc) == 0) {
-            struct pcb_t * tgt = caller->ready_queue->proc[i];
+            struct pcb_t * tgt = caller->mlq_ready_queue[prio].proc[i];
             for (int j = i; j < list_size - 1; j++) {
-                caller->ready_queue->proc[j] = caller->ready_queue->proc[j + 1];
+                caller->mlq_ready_queue[prio].proc[j] = caller->mlq_ready_queue[prio].proc[j + 1];
             }
             free(tgt);
-            caller->ready_queue->size--;
-            list_size = caller->running_list->size;
+            caller->mlq_ready_queue[prio].size--;
+            list_size = caller->mlq_ready_queue[prio].size;
             continue;
         }
         i++;
