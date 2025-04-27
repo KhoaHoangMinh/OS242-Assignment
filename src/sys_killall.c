@@ -58,6 +58,7 @@ int __sys_killall(struct pcb_t *caller, struct sc_regs* regs)
             free(tgt);
             caller->running_list->size--;
             list_size = caller->running_list->size;
+            printf("Process %s killed from running_list\n", proc_name);
             continue;
         }
         i++;
@@ -65,6 +66,7 @@ int __sys_killall(struct pcb_t *caller, struct sc_regs* regs)
 #ifdef MLQ_SCHED
     int prio = caller->prio;
     list_size = caller->mlq_ready_queue[prio].size;
+    printf("Traversing mlq_ready_queue...\n");
     i = 0;
     while (i < list_size) {
     proc_name = caller->mlq_ready_queue[prio].proc[i]->path + dir_len;
@@ -76,6 +78,7 @@ int __sys_killall(struct pcb_t *caller, struct sc_regs* regs)
             free(tgt);
             caller->mlq_ready_queue[prio].size--;
             list_size = caller->mlq_ready_queue[prio].size;
+            printf("Process %s killed from mlq_ready_queue\n", proc_name);
             continue;
         }
         i++;
