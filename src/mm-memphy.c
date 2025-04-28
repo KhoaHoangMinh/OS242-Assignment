@@ -112,6 +112,9 @@ int MEMPHY_write(struct memphy_struct *mp, int addr, BYTE data)
  *  MEMPHY_format-format MEMPHY device
  *  @mp: memphy struct
  */
+// Initializes the physical memory (mempy_struct)
+// by dividing it into frames of a given size (pagesz).
+// and creates a linked list of free frames (framephy_struct).
 int MEMPHY_format(struct memphy_struct *mp, int pagesz)
 {
    /* This setting come with fixed constant PAGESZ */
@@ -163,11 +166,25 @@ int MEMPHY_dump(struct memphy_struct *mp)
   /*TODO dump memphy contnt mp->storage
    *     for tracing the memory content
    */
+   // display the contents of the memory stored in the memphy_struct
+   // For debugging and tracing purposes
+   if (mp == NULL) return -1;
+   int it = 0;
+   printf("Dumping memphy_struct contents:\n");
+   for (it = 0; it < mp->maxsz; it++) {
+      printf("Address %d: %02x\n", it, mp->storage[it]);
+      if (it % 16 == 0) {
+         printf("\n%04d: ", it); // Print the starting address of the row
+     }
+     printf("%02X ", mp->storage[it]); // Print the memory content in hexadecimal
+   }
+   printf("\n");
    return 0;
 }
 
 int MEMPHY_put_freefp(struct memphy_struct *mp, int fpn)
 {
+   // fpn: frame number
    struct framephy_struct *fp = mp->free_fp_list;
    struct framephy_struct *newnode = malloc(sizeof(struct framephy_struct));
 

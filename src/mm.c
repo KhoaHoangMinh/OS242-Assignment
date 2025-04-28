@@ -80,30 +80,36 @@ int pte_set_fpn(uint32_t *pte, int fpn)
 /*
  * vmap_page_range - map a range of page at aligned address
  */
+/** 
+ * NOTE: cleaned
+ */
 int vmap_page_range(struct pcb_t *caller,           // process call
                     int addr,                       // start address which is aligned to pagesz
-                    int pgnum,                      // num of mapping page
-                    struct framephy_struct *frames, // list of the mapped frames
+                    int pgnum,                      // num of mapping page 
+                    struct framephy_struct *frames, // list of the mapped frames 
                     struct vm_rg_struct *ret_rg)    // return mapped region, the real mapped fp
-{                                                   // no guarantee all given pages are mapped
-  //struct framephy_struct *fpit;
-  int pgit = 0;
-  int pgn = PAGING_PGN(addr);
+{
+  // Update the start and end of the mapped region
+  ret_rg->rg_start = addr;
+  ret_rg->rg_end = addr + pgnum * PAGING_PAGESZ;
 
-  /* TODO: update the rg_end and rg_start of ret_rg 
-  //ret_rg->rg_end =  ....
-  //ret_rg->rg_start = ...
-  //ret_rg->vmaid = ...
-  */
+  struct framephy_struct *fpit = frames; // Iterator for frame list
+  int pgn = PAGING_PGN(addr);            // Starting virtual page number
+  int pgit;
 
-  /* TODO map range of frame to address space
-   *      [addr to addr + pgnum*PAGING_PAGESZ
-   *      in page table caller->mm->pgd[]
-   */
+  // Map each virtual page to a physical frame
+  for (pgit = 0; pgit < pgnum; pgit++) {
+    if (fpit == NULL) return -1; // No more frames available
 
-  /* Tracking for later page replacement activities (if needed)
-   * Enqueue new usage page */
-  enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
+    // Set the page table entry for the virtual page
+    pte_set_fpn(&caller->mm->pgd[pgn + pgit], fpit->fpn);
+
+    // Move to the next frame in the list
+    fpit = fpit->fp_next;
+
+    // Enqueue the mapped pages for tracking (e.g., for page replacement)
+    enlist_pgn_node(&caller->mm->fifo_pgn, pgn + pgit);
+  }
 
   return 0;
 }
@@ -114,31 +120,32 @@ int vmap_page_range(struct pcb_t *caller,           // process call
  * @req_pgnum : request page num
  * @frm_lst   : frame list
  */
-
+/**
+ * NOTE: cleaned 
+ */
 int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struct **frm_lst)
 {
   int pgit, fpn;
   struct framephy_struct *newfp_str = NULL;
+  *frm_lst = NULL;
 
-  /* TODO: allocate the page 
-  //caller-> ...
-  //frm_lst-> ...
-  */
+  for (pgit = 0; pgit < req_pgnum; pgit++) {
+    newfp_str = malloc(sizeof(struct framephy_struct));
+    if (newfp_str == NULL) return -1;
 
-  for (pgit = 0; pgit < req_pgnum; pgit++)
-  {
-  /* TODO: allocate the page 
-   */
-    if (MEMPHY_get_freefp(caller->mram, &fpn) == 0)
-    {
+    if (MEMPHY_get_freefp(caller->mram, &fpn) == 0) {
       newfp_str->fpn = fpn;
+    } else {
+      // Not enough frames available
+      // NOTE: Free all frames and return free frame list
+      return -3000;
     }
-    else
-    { // TODO: ERROR CODE of obtaining somes but not enough frames
-    }
+
+    newfp_str->fp_next = *frm_lst;
+    *frm_lst = newfp_str; 
   }
 
-  return 0;
+  return 0; // Success
 }
 
 /*
@@ -212,30 +219,44 @@ int __swap_cp_page(struct memphy_struct *mpsrc, int srcfpn,
  * @mm:     self mm
  * @caller: mm owner
  */
+/**'
+ * NOTE: cleaned
+ * @implements: Allocates pgd -> pgd[i] = 0 -> init symrtbl[i]
+ * -> init vma0 -> init vma0 -> enlist_vm_rg_node first_rg
+ * add   first_rg->rg_next = NULL;
+ */
 int init_mm(struct mm_struct *mm, struct pcb_t *caller)
 {
-  struct vm_area_struct *vma0 = malloc(sizeof(struct vm_area_struct));
-
+  // Allocate memory for the page directory
   mm->pgd = malloc(PAGING_MAX_PGN * sizeof(uint32_t));
+  if (mm->pgd == NULL) return -1; // Allocation failed
 
-  /* By default the owner comes with at least one vma */
+  // Initialize the page directory entries to 0
+  for (int i = 0; i < PAGING_MAX_PGN; i++) {
+    mm->pgd[i] = 0;
+  }
+
+  // Create the first virtual memory area (VMA)
+  struct vm_area_struct *vma0 = malloc(sizeof(struct vm_area_struct));
+  if (vma0 == NULL) return -1; // Allocation failed
+
   vma0->vm_id = 0;
   vma0->vm_start = 0;
-  vma0->vm_end = vma0->vm_start;
-  vma0->sbrk = vma0->vm_start;
+  vma0->vm_end = 0; // Initially empty
+  vma0->sbrk = 0;   // Program break starts at 0
+  vma0->vm_next = NULL;
+
+  // Initialize the free region list for the VMA
   struct vm_rg_struct *first_rg = init_vm_rg(vma0->vm_start, vma0->vm_end);
+  if (first_rg == NULL) return -1; // Allocation failed
+  first_rg->rg_next = NULL;
   enlist_vm_rg_node(&vma0->vm_freerg_list, first_rg);
 
-  /* TODO update VMA0 next */
-  // vma0->next = ...
+  // Link the VMA to the memory management structure
+  vma0->vm_mm = mm;
+  mm->mmap = vma0;
 
-  /* Point vma owner backward */
-  vma0->vm_mm = mm; 
-
-  /* TODO: update mmap */
-  //mm->mmap = ...
-
-  return 0;
+  return 0; // Success
 }
 
 struct vm_rg_struct *init_vm_rg(int rg_start, int rg_end)
